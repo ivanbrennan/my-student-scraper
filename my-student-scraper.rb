@@ -1,9 +1,12 @@
 =begin
-Your goal is to get a database that has all the student data (so say if we wanted to build a command line version of the student website we could use that database).
-Then you go to students.flatironschool.com and via nokogiri, find all the individual profile pages. Open each one of those (probably in a loop) and from the individual students page, scrape all their data.
-   
-Once you have all the students, drop it into a database.
-IVAN: do hard-coded, then try to add abstractions
+ADD columns:
+  name
+  social media(4)
+  stu website
+  quote
+  bio
+  work
+Refactor with abstractions
 =end
 
 require 'sqlite3'
@@ -11,27 +14,52 @@ require 'open-uri'
 require 'nokogiri'
 require 'ap'
 
-# Open a database
-db = SQLite3::Database.new "students.db"
+FLATIRON_DOMAIN = "http://students.flatironschool.com/"
 
-# Create a table in the database
+def build_html(url)
+  Nokogiri::HTML(open(url))
+end
+
+def stu_name(profile_html)
+  profile_html.css("h4.ib_main_header").text
+end
+
+def stu_img(profile_html)
+  src = profile_html.css("img.student_pic").attr("src").text
+  img_url = "#{FLATIRON_DOMAIN}#{src[3..-1]}"
+end
+
+idx_html = build_html(FLATIRON_DOMAIN)
+idx_links = idx_html.css("div.big-comment a").collect do |a|
+  "#{FLATIRON_DOMAIN}#{a["href"]}"
+end
+
+# Create an array of students
+students_arr = idx_links.inject([]) do |students, link|
+  student_html = build_html(link)
+  students << {
+    :name => stu_name(student_html),
+    :img => stu_img(student_html)
+  }
+end
+
+# SQL statements
+# Create table
 sql_create_table = <<-SQL
   CREATE TABLE IF NOT EXISTS students(
     id INTEGER PRIMARY KEY,
-    name TEXT
+    name TEXT,
+    img TEXT
   )
 SQL
 
+# Open a database
+db = SQLite3::Database.new "students.db"
+# Create a table in the database
 db.execute(sql_create_table)
 
-flatiron_domain = "http://students.flatironschool.com/"
-index_html = Nokogiri::HTML(open(flatiron_domain))
-
-index_links = index_html.css("div.big-comment a")
-index_urls = index_links.collect do |link|
-  "#{flatiron_domain}#{link["href"]}"
-end
-
-profiles_html_arr = index_urls.collect do |url|
-  profile_html = Nokogiri::HTML(open(url))
+# Insert students
+sql_insert = "INSERT INTO students (name, img) VALUES (?,?)"
+students_arr.each do |student_hash|
+  db.execute(sql_insert, student_hash[:name], student_hash[:img])
 end

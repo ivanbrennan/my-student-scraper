@@ -28,7 +28,10 @@ SQL
 
 db.execute(sql_create_table)
 
-index = "http://students.flatironschool.com/"
-index_html = Nokogiri::HTML(open(index))
+flatiron_domain = "http://students.flatironschool.com/"
+index_html = Nokogiri::HTML(open(flatiron_domain))
 
 index_links = index_html.css("div.big-comment a")
+index_urls = index_links.collect do |link|
+  "#{flatiron_domain}#{link["href"]}"
+end
